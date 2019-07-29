@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Moya
 
 final class ListViewController: UIViewController {
 
@@ -41,6 +42,9 @@ final class ListViewController: UIViewController {
         return picker
     }()
 
+    private let provider = MoyaProvider<PhotoApi>()
+    private let decoder = JSONDecoder()
+
     private var list: [Photo] = [] {
         didSet {
             collectionView.reloadData()
@@ -52,7 +56,21 @@ final class ListViewController: UIViewController {
         activityIndicator.isHidden = false
         activityIndicator.startAnimating()
 
-        // TODO: Implement to request listing API
+        provider.request(.list) { [weak self] result in
+            guard let ss = self else { return }
+
+            switch result {
+            case .success(let response):
+                let list = try? ss.decoder.decode(PhotoResponse.self, from: response.data).list
+                ss.list = list ?? []
+
+            case .failure(let error):
+                print(error)
+            }
+
+            ss.activityIndicator.isHidden = true
+            ss.activityIndicator.stopAnimating()
+        }
     }
 
     private func setupConstraints() {
@@ -163,7 +181,9 @@ extension ListViewController: UICollectionViewDataSource {
 extension ListViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
         if let url = info[UIImagePickerController.InfoKey.imageURL] as? URL {
-            // TODO: Implement to request uploading API
+            provider.request(.upload(fileUrl: url)) { [weak self] result in
+                self?.request()
+            }
         }
 
         dismiss(animated: true, completion: nil)
